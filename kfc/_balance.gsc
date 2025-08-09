@@ -1,152 +1,91 @@
-#include code\utility;
+// Made by szir for KFC Mod
+#include maps\mp\_utility;
+#include maps\mp\gametypes\_hud_util;
+
 init()
 {
-	if( getDvar( "g_gametype" ) == "sd" )
-		thread code\events::addSpawnEvent( ::onSpawn );
-	else
-		thread timedBalance();
+    // Ejecutar BalanceTeams cuando un jugador spawnea
+    level on("spawned", ::BalanceTeams);
 }
 
-onSpawn()
+BalanceTeams()
 {
-	level notify( "only_one_check" );
-	level endon( "only_one_check" );
-	
-	wait 4;
-	
-	level.axisnum = 0;
-	level.alliesnum = 0;
-	
-	wait .05;
+    // Finaliza el hilo si hay votación o termina el juego
+    level endon("vote started");
+    level endon("game_ended");
 
-	players = getPlayers();
-	
-	for( i=0; i<players.size; i++ )
-	{
-		if( players[i].team == "axis" )
-			level.axisnum++;
+    while (true)
+    {
+        wait 10; // Esperar 10 segundos entre chequeos
 
-		else if( players[i].team == "allies" )
-			level.alliesnum++;
-			
-		waittillframeend;
-	}
-	
-	wait .1;
-	
-	if( level.axisnum == level.alliesnum )
-		return;
+        int team1Count = countPlayersInTeam("axis");   // Cambia "axis" y "allies" según tus equipos
+        int team2Count = countPlayersInTeam("allies");
 
-	else if( level.axisnum < level.alliesnum )
-	{
-		if( level.alliesnum - level.axisnum > 1 )
-			thread balanceAxis( level.alliesnum - level.axisnum );
-		else
-			return;
-	}
-
-	else
-	{
-		if( level.axisnum - level.alliesnum > 1 )
-			thread balanceAllies( level.axisnum - level.alliesnum );
-		else
-			return;
-	}
-	
-	iprintlnbold( "Balancing teams..." );
+        if (team1Count > team2Count + 1)
+        {
+            player p = getPlayerFromTeam("axis");
+            if (p)
+            {
+                movePlayerToTeam(p, "allies");
+                iPrintln(p.name + " has been moved to allies to balance teams.");
+            }
+        }
+        else if (team2Count > team1Count + 1)
+        {
+            player p = getPlayerFromTeam("allies");
+            if (p)
+            {
+                movePlayerToTeam(p, "axis");
+                iPrintln(p.name + " has been moved to axis to balance teams.");
+            }
+        }
+    }
 }
 
-timedBalance()
+// Cuenta jugadores vivos en un equipo que no sean espectadores
+int countPlayersInTeam(string team)
 {
-	level endon( "game_ended" );
-	for(;;)
-	{
-		wait 30;
-		thread onSpawn();  // Lazy xD
-	}
-}
-//////////////////////////////////////////////////////////////////
-// TODO:                                                        //
-// This should be one function only with extra "Team" variable. //
-//////////////////////////////////////////////////////////////////
-balanceAxis( num )
-{
-	people = int( num/2 );
-	
-	players = getPlayers();
-	magic = 0;
-	pool = [];
-	for( i=0; i<players.size; i++ )
-	{
-		if( players[i].team == "allies" )
-		{
-			pool[magic] = players[i];
-			magic++;
-		}
-		waittillframeend;
-	}
-	
-	for( p=0; p<people; p++ )
-	{
-		number = randomIntRange( 0, pool.size );
-		
-		if( pool[ number ].team == "allies" )
-		{
-			pool[ number ] suicide();
-			pool[ number ] setTeam( "axis" );
-			pool[ number ] thread maps\mp\gametypes\_globallogic::spawnPlayer();
-		}
-		else
-		{
-			if( p == 0 )
-				continue;
-			else
-				p--;
-		}
-		waittillframeend;
-	}
-	
-	wait .1;
-	level notify( "only_one_check" );
+    player[] players = getPlayers();
+    int count = 0;
+    for (int i = 0; i < players.size; i++)
+    {
+        if (players[i].team == team && players[i].sessionteam != "spectator" && isAlive(players[i]))
+            count++;
+    }
+    return count;
 }
 
-balanceAllies( num )
+// Obtiene un jugador válido para mover (no admin, no AFK, etc)
+player getPlayerFromTeam(string team)
 {
-	people = int( num/2 );
-	
-	players = getPlayers();
-	magic = 0;
-	pool = [];
-	for( i=0; i<players.size; i++ )
-	{
-		if( players[i].team == "axis" )
-		{
-			pool[magic] = players[i];
-			magic++;
-		}
-		waittillframeend;
-	}
-	
-	for( p=0; p<people; p++ )
-	{
-		number = randomIntRange( 0, pool.size );
-		
-		if( isDefined( pool[ number ] ) && pool[ number ].team == "axis" )
-		{
-			pool[ number ] suicide();
-			pool[ number ] setTeam( "allies" );
-			pool[ number ] thread maps\mp\gametypes\_globallogic::spawnPlayer();
-		}
-		else
-		{
-			if( p == 0 )
-				continue;
-			else
-				p--;
-		}
-		waittillframeend;
-	}
-	
-	wait .1;
-	level notify( "only_one_check" );
+    player[] players = getPlayers();
+    for (int i = 0; i < players.size; i++)
+    {
+        player p = players[i];
+        if (p.team == team && p.sessionteam != "spectator" && isAlive(p))
+        {
+            // Aquí puedes agregar más filtros, por ejemplo no mover admins o jugadores AFK
+            if (!isDefined(p.isAdmin) || !p.isAdmin) 
+                return p;
+        }
+    }
+    return null;
+}
+
+// Cambia el equipo del jugador y lo hace respawnear
+void movePlayerToTeam(player p, string newTeam)
+{
+    if (!isDefined(p))
+        return;
+
+    // Forzar respawn para evitar bugs
+    p suicide();
+
+    p setTeam(newTeam);
+
+    // Respawnear al jugador
+    p thread maps\mp\gametypes\_globallogic::spawnPlayer();
+
+    // Mensaje privado al jugador
+    p iprintlnbold("^2You were moved to " + newTeam + " to balance teams.");
 }
