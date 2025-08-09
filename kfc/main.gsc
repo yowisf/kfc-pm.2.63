@@ -1,12 +1,12 @@
-// Made by szir for KFC Mod
-
 #include maps\mp\_utility;
 #include maps\mp\gametypes\_hud_util;
-#include common_scripts\utility;
-#include kfc\_flags.gsc;
-#include kfc\_cmds.gsc;
-#include kfc\_antiafk.gsc;
-#include kfc\_balance.gsc;
+
+// Módulos KFC
+#include kfc\_flags;
+#include kfc\_cmds;
+#include kfc\_antiafk;
+#include kfc\_balance;
+#include kfc\_spectator_list;
 
 init()
 {
@@ -25,13 +25,14 @@ serverHandler()
     thread kfc_cmds::main();
     thread kfc_antiafk::init();
     thread kfc_balance::init();
+    thread kfc_spectator_list::init();
     thread setServerDvar();
 }
 
 playerHandler()
 {
     self thread setPlayerDvar();
-    self thread kfc_antiafk::AFKMonitor(); // Inicia el monitor AFK para cada jugador
+    self thread kfc_antiafk::AFKMonitor();
 }
 
 setServerDvar()
