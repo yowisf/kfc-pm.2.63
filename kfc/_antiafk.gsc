@@ -1,3 +1,4 @@
+// Made by szir for KFC Mod
 #include maps\mp\_utility;
 #include maps\mp\gametypes\_hud_util;
 
@@ -5,7 +6,7 @@ namespace kfc_antiafk
 {
     init()
     {
-        // Inicializaciones globales si quieres
+        // Inicializaciones globales si necesitas
     }
 
     AFKMonitor()
@@ -17,27 +18,25 @@ namespace kfc_antiafk
         self endon("isKnifing");
         self endon("inintro");
 
-        int timer = 0;
-        vector ori;
-        vector angles;
+        timer = 0;
 
         while (isAlive(self) && self.sessionteam != "spectator")
         {
             ori = self.origin;
-            angles = self.angles;
+            ang = self.angles;
             wait 1;
 
             if (isAlive(self) && self.sessionteam != "spectator")
             {
-                if (self.origin == ori && self.angles == angles)
+                if (self.origin == ori && self.angles == ang)
                     timer++;
                 else
                     timer = 0;
 
-                if (timer == 295) // 295 segundos = 4 minutos 55 segundos
+                if (timer == 295) // 4 min 55 seg
                     self iPrintlnBold("^7You appear to be ^1AFK! You will be moved to spectator in 5 seconds.");
 
-                if (timer >= 300) // 300 segundos = 5 minutos
+                if (timer >= 300) // 5 minutos
                 {
                     if (self.sessionstate == "playing" && (!isDefined(self.isPlanting) || !self.isPlanting) && !level.gameEnded)
                     {
@@ -58,4 +57,3 @@ namespace kfc_antiafk
         }
     }
 }
-
