@@ -1,0 +1,73 @@
+#include maps\mp\_utility;
+#include maps\mp\gametypes\_hud_util;
+
+init()
+{
+    for(;;)
+    {
+        wait 1;
+        players = getPlayers();
+        for (i = 0; i < players.size; i++)
+        {
+            p = players[i];
+            if (isAlive(p))
+            {
+                if (!isDefined(p.spectHUD_thread))
+                    p.spectHUD_thread = p thread updateSpectatorHUD();
+            }
+        }
+    }
+}
+
+updateSpectatorHUD()
+{
+    self endon("disconnect");
+    self endon("death");
+
+    if (!isDefined(self.spectHUD))
+    {
+        self.spectHUD = createFontString("default", 1.4);
+        self.spectHUD setPoint("TOPLEFT", "TOPLEFT", 30, 48); // posición debajo del radar
+        self.spectHUD.color = (1,1,1);
+        self.spectHUD.alpha = 1;
+    }
+
+    for (;;)
+    {
+        spectators = getSpectatorsWatching(self);
+        count = spectators.size;
+
+        if (count > 0)
+        {
+            text = "Spectating [" + count + "] " + spectators[0].name;
+            if (count > 1)
+            {
+                for (j = 1; j < count; j++)
+                    text += ", " + spectators[j].name;
+            }
+            self.spectHUD setText(text);
+        }
+        else
+        {
+            self.spectHUD setText("");
+        }
+
+        wait 0.5;
+    }
+}
+
+getSpectatorsWatching(playerToCheck)
+{
+    allPlayers = getPlayers();
+    list = [];
+    for (k = 0; k < allPlayers.size; k++)
+    {
+        sp = allPlayers[k];
+        if (sp != playerToCheck && sp.sessionteam == "spectator" &&
+            isDefined(sp.spectatorclient) && sp.spectatorclient == playerToCheck getEntityNumber())
+        {
+            list[list.size] = sp;
+        }
+    }
+    return list;
+}
