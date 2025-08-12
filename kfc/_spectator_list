@@ -18,53 +18,8 @@ substr_safe(str, start, len)
     return result;
 }
 
-/*
-  Crea los HUDs en el contexto del jugador (self será el cliente),
-  esto hace que el hud sea local a ese cliente.
-*/
-spectator_create_hud()
-{
-    // self = el jugador para el que se crea el HUD (por eso usamos thread en player)
-    self endon("disconnect");
-    self endon("level_shutdown");
-    self endon("map_restart");
-
-    // HUD para el jugador observado (lista bajo el minimapa)
-    hud = newHudElem();
-    hud.horzAlign = "left";
-    hud.vertAlign = "top";
-    hud.x = 18;
-    hud.y = 130;
-    hud.font = "objective";
-    hud.fontscale = 1.4; // mínimo recomendable
-    hud.color = (1, 1, 1);
-    hud.alpha = 1;
-    hud.sort = 1;
-    self.spectatorListHUD = hud;
-
-    // HUD para el espectador (muestra el nombre del objetivo observado)
-    vh = newHudElem();
-    vh.horzAlign = "left";
-    vh.vertAlign = "top";
-    vh.x = 9;
-    vh.y = 8;
-    vh.font = "objective";
-    vh.fontscale = 1.4;
-    vh.color = (1, 1, 1);
-    vh.alpha = 1;
-    vh.sort = 1;
-    self.spectatorViewerHUD = vh;
-
-    // Mantener thread vivo mientras el jugador exista
-    for (;;)
-    {
-        wait 1;
-    }
-}
-
 spectator_list_init()
 {
-    // Configurables
     level.spectatorUpdateInterval = 0.6;   // segundos entre actualizaciones
     level.spectatorMaxShow       = 6;     // máximo espectadores a mostrar
     level.spectatorNameMaxLen    = 14;    // máximo caracteres de nombre
@@ -75,47 +30,70 @@ spectator_list_init()
 spectator_list_think()
 {
     level endon("game_ended");
-    level endon("level_shutdown");
     level endon("map_restart");
+    level endon("level_shutdown");
 
     for (;;)
     {
         players = getEntArray("player", "classname");
 
-        // Asegurar que cada jugador tenga su HUD *local* (se crea en su thread)
+        // Crear HUDs privados por jugador
         for (i = 0; i < players.size; i++)
         {
             pl = players[i];
             if (!isDefined(pl))
                 continue;
 
-            if (!isDefined(pl.spectatorListHUD) || !isDefined(pl.spectatorViewerHUD))
+            if (!isDefined(pl.spectatorListHUD))
             {
-                // arrancar thread en contexto del jugador para crear HUDs locales
-                pl thread spectator_create_hud();
-                // Esperamos un tick para que el thread cree los HUDs antes de seguir (opcional)
-                // wait 0;
+                hud = newClientHudElem(pl);
+                hud.owner = pl;
+                hud.horzAlign = "left";
+                hud.vertAlign = "top";
+                hud.x = 18;
+                hud.y = 130;
+                hud.font = "objective";
+                hud.fontscale = 1.4;
+                hud.color = (1, 1, 1);
+                hud.alpha = 1;
+                hud.sort = 1;
+                pl.spectatorListHUD = hud;
+            }
+            else
+            {
+                pl.spectatorListHUD setText("");
+            }
+
+            if (!isDefined(pl.spectatorViewerHUD))
+            {
+                vh = newClientHudElem(pl);
+                vh.owner = pl;
+                vh.horzAlign = "left";
+                vh.vertAlign = "top";
+                vh.x = 9;
+                vh.y = 8;
+                vh.font = "objective";
+                vh.fontscale = 1.4;
+                vh.color = (1, 1, 1);
+                vh.alpha = 1;
+                vh.sort = 1;
+                pl.spectatorViewerHUD = vh;
+            }
+            else
+            {
+                pl.spectatorViewerHUD setText("");
             }
         }
 
-        // Limpiar textos (cada HUD es local al cliente, así solo limpiamos por jugador)
-        for (i = 0; i < players.size; i++)
-        {
-            p = players[i];
-            if (!isDefined(p)) continue;
-            if (isDefined(p.spectatorListHUD)) p.spectatorListHUD setText("");
-            if (isDefined(p.spectatorViewerHUD)) p.spectatorViewerHUD setText("");
-        }
-
-        // Por cada jugador target, buscar quién lo está observando y actualizar sólo a esos clientes
+        // Revisar quién observa a quién
         for (i = 0; i < players.size; i++)
         {
             target = players[i];
             if (!isDefined(target))
                 continue;
 
-            // encontrar viewers -> espectadores que tienen spectatorclient igual al entityNum del target
             spectators = [];
+
             for (j = 0; j < players.size; j++)
             {
                 viewer = players[j];
@@ -128,13 +106,14 @@ spectator_list_think()
                 if (!isDefined(viewer.spectatorclient))
                     continue;
 
+                // Solo contar si está mirando a target
                 if (viewer.spectatorclient == (target getEntityNumber()))
                 {
                     spectators[spectators.size] = viewer;
                 }
             }
 
-            // Si hay espectadores, mostramos:
+            // Mostrar HUD solo si hay espectadores
             if (spectators.size > 0)
             {
                 maxShow = level.spectatorMaxShow;
@@ -142,11 +121,8 @@ spectator_list_think()
                 count = spectators.size;
                 if (count > maxShow) count = maxShow;
 
-                // header SIN ":" después del número (según tu pedido)
-                header = "spectators (" + spectators.size + ")\n";
+                text = "spectators (" + spectators.size + ")\n";
 
-                // construir texto con truncado seguro
-                text = header;
                 for (k = 0; k < count; k++)
                 {
                     name = spectators[k].name;
@@ -159,11 +135,11 @@ spectator_list_think()
                     if (k < count - 1) text = text + "\n";
                 }
 
-                // Mostrar lista SOLO en el HUD del target (ese HUD es local al target)
+                // El HUD solo lo ve el target (observado)
                 if (isDefined(target.spectatorListHUD))
                     target.spectatorListHUD setText(text);
 
-                // Mostrar el nombre del objetivo SOLO a sus espectadores
+                // Y este HUD (nombre del observado) solo lo ven los espectadores
                 obsName = target.name;
                 if (!isDefined(obsName)) obsName = "unknown";
                 if (obsName.size > level.spectatorNameMaxLen)
@@ -176,7 +152,6 @@ spectator_list_think()
                         v.spectatorViewerHUD setText(obsName);
                 }
             }
-            // si no hay espectadores, los HUD ya fueron limpiados más arriba
         }
 
         wait level.spectatorUpdateInterval;
