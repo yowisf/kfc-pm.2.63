@@ -1,38 +1,42 @@
-#include maps\mp\_utility;
-#include maps\mp\gametypes\_hud_util;
-
-// Módulos KFC
-#include kfc\_flags;
-#include kfc\_cmds;
-#include kfc\_antiafk;
-#include kfc\_balance;
-#include kfc\_spectator_list;
+#include maps\mp\kfc\_antiafk;
+#include maps\mp\kfc\_spectator_list;
 
 init()
 {
-    level thread serverHandler();
-
-    for (;;)
-    {
-        level waittill("connected", player);
-        player thread playerHandler();
-    }
+    main();
 }
 
-serverHandler()
+main()
 {
-    thread kfc_flags::init();
-    thread kfc_cmds::main();
-    thread kfc_antiafk::init();
-    thread kfc_balance::init();
-    thread kfc_spectator_list::init();
-    thread setServerDvar();
+    thread maps\mp\kfc\_cmds::main();
+    thread maps\mp\kfc\_spectator_list::spectator_list_init();
+
+    setServerDvar();
+
+    level.onPlayerConnect = ::onPlayerConnect;
+}
+
+onPlayerConnect()
+{
+    self waittill("connected");
+
+    setPlayerDvar();
+
+    playerHandler();
+
+    // Iniciar el sistema AFK para este jugador
+    self thread maps\mp\kfc\_antiafk::AFKMonitor();
 }
 
 playerHandler()
 {
-    self thread setPlayerDvar();
-    self thread kfc_antiafk::AFKMonitor();
+    self endon("disconnect");
+
+    for (;;)
+    {
+        self waittill("spawned_player");
+        // Lógica personalizada del jugador
+    }
 }
 
 setServerDvar()
@@ -44,3 +48,4 @@ setPlayerDvar()
 {
     self setClientDvar("cl_maxpackets", 125);
 }
+
