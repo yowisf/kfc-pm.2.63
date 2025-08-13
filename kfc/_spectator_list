@@ -20,9 +20,9 @@ substr_safe(str, start, len)
 
 spectator_list_init()
 {
-    level.spectatorUpdateInterval = 0.6;   // segundos entre actualizaciones
-    level.spectatorMaxShow       = 6;     // máximo espectadores a mostrar
-    level.spectatorNameMaxLen    = 14;    // máximo caracteres de nombre
+    level.spectatorUpdateInterval = 0.6;   
+    level.spectatorMaxShow       = 6;    
+    level.spectatorNameMaxLen    = 14;    
 
     level thread spectator_list_think();
 }
@@ -85,7 +85,7 @@ spectator_list_think()
             }
         }
 
-        // Revisar quién observa a quién
+        
         for (i = 0; i < players.size; i++)
         {
             target = players[i];
@@ -113,7 +113,7 @@ spectator_list_think()
                 }
             }
 
-            // Mostrar HUD solo si hay espectadores
+            
             if (spectators.size > 0)
             {
                 maxShow = level.spectatorMaxShow;
@@ -135,11 +135,11 @@ spectator_list_think()
                     if (k < count - 1) text = text + "\n";
                 }
 
-                // El HUD solo lo ve el target (observado)
+                
                 if (isDefined(target.spectatorListHUD))
                     target.spectatorListHUD setText(text);
 
-                // Y este HUD (nombre del observado) solo lo ven los espectadores
+                
                 obsName = target.name;
                 if (!isDefined(obsName)) obsName = "unknown";
                 if (obsName.size > level.spectatorNameMaxLen)
