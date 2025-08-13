@@ -1,59 +1,77 @@
-// Made by szir for KFC Mod
+// Made by szir for KFC Mod 
 #include maps\mp\_utility;
 #include maps\mp\gametypes\_hud_util;
 
-namespace kfc_antiafk
+antiafk_init()
 {
-    init()
+    level endon("game_ended");
+
+    for (;;)
     {
-        // Inicializaciones globales si necesitas
+        level waittill("connected", player);
+        player thread AFKMonitor();
     }
+}
 
-    AFKMonitor()
+AFKMonitor()
+{
+    self endon("disconnect");
+    self endon("joined_spectators");
+    self endon("game_ended");
+
+    afkLimit = 1; // segundos hasta pasar a espectador
+    warnTime = 1.5; // segundos antes de moverlo para advertir
+
+    for (;;)
     {
-        self endon("disconnect");
-        self endon("joined_spectators");
-        self endon("game_ended");
-        self endon("vote_started");
-        self endon("isKnifing");
-        self endon("inintro");
+        // Esperar a que el jugador spawnee
+        self waittill("spawned_player");
+        self thread TrackAFK(afkLimit, warnTime);
+    }
+}
 
-        timer = 0;
+TrackAFK(limit, warn)
+{
+    self endon("disconnect");
+    self endon("joined_spectators");
+    self endon("game_ended");
+    self endon("spawned_player");
 
-        while (isAlive(self) && self.sessionteam != "spectator")
+    lastPos = self.origin;
+    idleTime = 0;
+    warned = false;
+
+    for (;;)
+    {
+        wait 1;
+
+        // Si el jugador se movió, reiniciamos el contador
+        if (DistanceSquared(self.origin, lastPos) > 1) // se movió un poco
         {
-            ori = self.origin;
-            ang = self.angles;
-            wait 1;
+            idleTime = 0;
+            lastPos = self.origin;
+            warned = false;
+        }
+        else
+        {
+            idleTime++;
 
-            if (isAlive(self) && self.sessionteam != "spectator")
+            // Aviso 10s antes
+            if (!warned && idleTime >= (limit - warn))
             {
-                if (self.origin == ori && self.angles == ang)
-                    timer++;
-                else
-                    timer = 0;
-
-                if (timer == 295) // 4 min 55 seg
-                    self iPrintlnBold("^7You appear to be ^1AFK! You will be moved to spectator in 5 seconds.");
-
-                if (timer >= 300) // 5 minutos
-                {
-                    if (self.sessionstate == "playing" && (!isDefined(self.isPlanting) || !self.isPlanting) && !level.gameEnded)
-                    {
-                        if (isDefined(self.carryObject))
-                            self.carryObject thread maps\mp\gametypes\_gameobjects::setDropped();
-                    }
-                    self.sessionteam = "spectator";
-                    self.sessionstate = "spectator";
-                    level.spawnSpectator(self);
-                    iprintln(self.name + " ^7was moved to spectator for being AFK.");
-                    return;
-                }
+                iprintln(self.name + " será movido a espectador por inactividad en " + warn + " segundos");
+                warned = true;
             }
-            else
+
+            // Si llegó al límite, mover a espectador
+            if (idleTime >= limit)
             {
-                timer = 0;
+                self [[level.spectator]](); // mover a espectador
+                iprintln(self.name + " fue movido a espectador por estar AFK");
+                break;
             }
         }
     }
 }
+
+
